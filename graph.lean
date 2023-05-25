@@ -113,43 +113,41 @@ begin
   simpa using h, 
 end 
 
-lemma arc_or_half_edge_of_card_inc_eq_one {i : bool} (h : (G.inc i e).card = 1) : 
-  G.arc e ∨ G.half_edge e  := 
+lemma arc_or_loop_or_half_edge_of_card_inc_eq_one {i : bool} (h : (G.inc i e).card = 1) : 
+  G.arc e ∨ G.loop e ∨ G.half_edge e  := 
 begin
   rw [finset.card_eq_one] at h, 
-  sorry 
+  obtain ⟨a, ha⟩ := h, 
+  obtain (h0 | h1) := eq_or_ne (G.inc (!i) e) ∅, 
+  { cases (free_or_half_edge_of_inc_eq_empty h0).symm with h' h', right, right, assumption, 
+    rw [h', eq_comm] at ha,
+    simpa using ha },
+  rw [←finset.nonempty_iff_ne_empty, ←finset.card_pos, ←nat.succ_le_iff, 
+    le_iff_eq_or_lt, eq_comm, finset.card_eq_one, nat.lt_iff_add_one_le, one_add_one_eq_two] at h1, 
+  obtain (⟨b, hb⟩ | h2) := h1, 
+  { obtain (rfl | hne) := eq_or_ne a b, 
+    { right, left, use a, cases i; {rintro (j | j); assumption } },
+    left, 
+    cases i, 
+    { use [a, b, hne, ha, hb], },
+    { use [b, a, hne.symm, hb, ha] } },
+  obtain ⟨u,v,huv, h⟩ := G.well_def _ _ h2, 
+  apply_fun finset.card at ha, 
+  rw [h, finset.card_pair huv, finset.card_singleton] at ha, 
+  simpa using ha, 
 end 
 
 lemma edge_types (G : graph V E) (e : E) : 
   G.free e ∨ G.half_edge e ∨ G.loop e ∨ G.edge e ∨ G.arc e :=
 begin
-  rw [edge_iff_exists_inc_card_eq_two], 
-
-  obtain (⟨i,u,v,huv,hGuv⟩ | h01) := em (∃ i u v, u ≠ v ∧ G.inc i e = {u,v}), 
-  { right, right, right, left, 
-    have h := G.well_def i e, 
-    rw [hGuv, finset.card_pair huv, imp_iff_right rfl.le] at h, 
-    simp only [hGuv, mem_insert_iff, eq_self_iff_true, true_or, mem_singleton, 
-      or_true, bool.forall_bool, true_and, forall_true_left] at h, 
-    obtain ⟨u,v,huv, h1, h2⟩ := h, 
-    refine ⟨u,v, huv, _⟩,
-    rintro (i | i); assumption }, 
-  rw not_exists at h01, 
-
-  have h0 := zero_or_one_or_two_inc G e ff, 
-  rw [or_iff_left (h01 ff)] at h0,
-  have h1 := zero_or_one_or_two_inc G e tt, 
-  rw [or_iff_left (h01 tt)] at h1, 
-
-  obtain ⟨(h00 | ⟨u0,hu0⟩), (h10 | ⟨u1,hu1⟩)⟩ := ⟨h0,h1⟩, 
-  { left, rintro (i | i); assumption }, 
-  { right, left, refine ⟨tt, u1, hu1, by simpa⟩ },
-  { right, left, refine ⟨ff, u0, hu0, by simpa⟩ },
-
-  obtain (rfl | hne) := eq_or_ne u0 u1, 
-  { right, right, left, use u0, rintro (i | i); assumption, },
-  right, right, right, right, 
-  use [u0,u1,hne,hu0,hu1],
+  have h := G.inc_card_le tt e, 
+  obtain (h1 | h2) := lt_or_eq_of_le h, 
+  { rw [nat.lt_succ_iff, le_iff_eq_or_lt, nat.lt_succ_iff, 
+      le_zero_iff, finset.card_eq_zero] at h1,
+    cases h1, 
+    { have := arc_or_loop_or_half_edge_of_card_inc_eq_one h1, tauto },
+    have := free_or_half_edge_of_inc_eq_empty h1, tauto },
+  have := edge_of_inc_card_eq_two h2, tauto, 
 end 
 
 /-- Two vertices are adjacent if there is an edge having both as ends. -/
@@ -161,11 +159,6 @@ class loopless (G : graph V E) : Prop := (no_loops : ∀ e, ¬G.loop e)
 
 class simple (G : graph V E) extends loopless G := 
 (inc_inj : ∀ e f, (∀ i, G.inc i e = G.inc i f) → e = f)
-
-
-
-
-
 
 
 end graph 
