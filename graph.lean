@@ -28,7 +28,7 @@ open set
   If, on top of this, we forbid loops and insist that the 'ends' map is injective, we get simple 
   graphs.
   -/
-structure graph (V : Type*) (E : Type*) := 
+@[ext] structure graph (V : Type*) (E : Type*) := 
   (inc : bool → E → finset V)
   (well_def : ∀ i e, 2 ≤ (inc i e).card → ∃ (u v : V), u ≠ v ∧ ∀ j, inc j e = ({u,v} : finset V))
 
@@ -150,15 +150,79 @@ begin
   have := edge_of_inc_card_eq_two h2, tauto, 
 end 
 
+def edge_between (G : graph V E) (e : E) (v₁ v₂ : V) : Prop := ∀ i, G.inc i e = {v₁,v₂}
+
 /-- Two vertices are adjacent if there is an edge having both as ends. -/
 def adj (G : graph V E) (u v : V) : Prop := ∃ e, u ∈ G.ends e ∧ v ∈ G.ends e 
 
+/-- An undirected graph is one with no arcs or half-edges. -/
 class undirected (G : graph V E) : Prop := (edge_symm : ∀ e, G.undir e)
 
-class loopless (G : graph V E) : Prop := (no_loops : ∀ e, ¬G.loop e)
+/-- A loopless graph is one with no loops, free edges or half_edges 
+  (so every edge is an arc or edge ) -/
+class loopless (G : graph V E) : Prop := 
+(no_loops : ∀ e, ¬G.loop e)
+(no_free : ∀ e, ¬G.free e)
+(no_half : ∀ e, ¬G.half_edge e)
 
-class simple (G : graph V E) extends loopless G := 
+class multigraph (G : graph V E) extends undirected G := 
+(no_free : ∀ e, ¬G.free e)
+
+/-- A simple graph is one where every edge is a actual undirected 'edge',
+  and no two edges have the same ends.  -/
+class simple (G : graph V E) extends loopless G, undirected G := 
 (inc_inj : ∀ e f, (∀ i, G.inc i e = G.inc i f) → e = f)
+
+/-- A `pair_graph` is one whose edges are literally pairs of vertices. The pairs that aren't 
+  present are given as free edges. This is weird, but allows for complementation.  -/
+class pair_graph (G : graph V (V × V)) := 
+(h_pair' : ∀ e, G.free e ∨ G.edge_between e e.1 e.2)
+
+lemma free_or_pair (G : graph V (V × V)) [pair_graph G] (e : V × V) : 
+  G.free e ∨ G.edge_between e e.1 e.2 := ‹pair_graph G›.h_pair' e
+
+def edge_set (G : graph V (V × V)) : set (V × V) := { e | G.edge_between e e.1 e.2 }
+
+def pair_graph_of (E : set (V × V)) : graph V (V × V) := 
+{ inc := λ i e, if e ∈ E then {e.1,e.2} else ∅ ,
+  well_def := begin
+    intros i e h, 
+    rw [apply_ite finset.card, finset.card_empty] at h, 
+    split_ifs at h, 
+    { refine ⟨e.1, e.2, _, λ i, _⟩,
+      { intro h_eq, 
+        rw [h_eq, finset.pair_eq_singleton, finset.card_singleton] at h, norm_num at h },
+      rw [if_pos h_1] },
+    norm_num at h, 
+  end } 
+
+@[simp] lemma eq_pair_graph_of (G : graph V (V × V)) [pair_graph G] : 
+  pair_graph_of G.edge_set = G := 
+begin
+  ext i e, 
+  simp only [edge_set, pair_graph_of, edge_between, mem_set_of_eq, bool.forall_bool], 
+  split_ifs, 
+  { cases i, rw h.1, rw h.2 },
+  simp only [finset.not_mem_empty, false_iff], 
+  obtain (h0 | he) := G.free_or_pair e,  
+  { simp [h0 i] },
+  rw [he, he] at h, 
+  simpa using h, 
+end 
+
+@[simp] lemma edge_set_of_pair_graph (E : set (V × V)) : (pair_graph_of E).edge_set  = E := 
+begin
+  ext e, 
+  simp only [edge_set, pair_graph_of, edge_between, ite_eq_left_iff, bool.forall_bool, 
+    and_self, mem_set_of_eq, @eq_comm _ ∅, finset.insert_ne_empty], 
+  tauto,   
+end 
+
+/-- The complement of a `pair_graph` -/
+def compl (G : graph V (V × V)) : graph V (V × V) := pair_graph_of G.edge_setᶜ
+
+@[simp] lemma compl_compl (G : graph V (V × V)) [pair_graph G] : G.compl.compl = G := 
+  by simp [compl]
 
 
 end graph 
